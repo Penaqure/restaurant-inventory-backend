@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const sequelize = require("../config/db");
-const { Restaurant, User } = require("../models");
+const { Restaurant, User, UserDirectory } = require("../models");
 const { runInTenantSchema, assertSafeSchemaName } = require("./tenantContext");
 const { migrateTenantSchema } = require("../scripts/tenantMigrator");
 const logger = require("../utils/logger");
@@ -37,6 +37,16 @@ async function provisionRestaurant({ name, slug, adminName, adminEmail, adminPas
 
   const schemaName = deriveSchemaName(slug);
   assertSafeSchemaName(schemaName);
+  const email = adminEmail.toLowerCase();
+
+  // Fail fast, before creating anything, if this email is already someone
+  // else's login -- email is the sole login key across the whole platform
+  // now, so it has to be globally unique, not just unique per restaurant.
+  if (await UserDirectory.findOne({ where: { email } })) {
+    const err = new Error("adminEmail is already registered to another restaurant");
+    err.status = 409;
+    throw err;
+  }
 
   const restaurant = await Restaurant.create({ name, slug, schemaName, status: "active" });
 
@@ -45,12 +55,10 @@ async function provisionRestaurant({ name, slug, adminName, adminEmail, adminPas
     await migrateTenantSchema(schemaName);
 
     const passwordHash = await bcrypt.hash(adminPassword, 10);
-    await runInTenantSchema(schemaName, (t) =>
-      User.create(
-        { name: adminName, email: adminEmail.toLowerCase(), passwordHash, role: "admin" },
-        { transaction: t }
-      )
+    const adminUser = await runInTenantSchema(schemaName, (t) =>
+      User.create({ name: adminName, email, passwordHash, role: "admin" }, { transaction: t })
     );
+    await UserDirectory.create({ email, restaurantId: restaurant.id, tenantUserId: adminUser.id });
   } catch (err) {
     logger.error("restaurant.provisioning_failed", { slug, schemaName, error: err.message });
     await sequelize.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`).catch(() => {});
@@ -58,7 +66,7 @@ async function provisionRestaurant({ name, slug, adminName, adminEmail, adminPas
     throw err;
   }
 
-  return { restaurant, adminEmail: adminEmail.toLowerCase() };
+  return { restaurant, adminEmail: email };
 }
 
 module.exports = { provisionRestaurant, deriveSchemaName, assertValidSlug };

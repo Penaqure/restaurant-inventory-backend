@@ -13,8 +13,9 @@ billing, and billing keeps working normally even if this app is offline.
 Each restaurant gets its own Postgres **schema** containing all of its
 business tables (users, ingredients, stock, suppliers, equipment, payroll,
 ...) — fully isolated from every other restaurant, all in one database. A
-`public` schema holds the restaurant registry (`restaurants`) and platform
-super-admin accounts (`platform_admins`), which are separate from any
+`public` schema holds the restaurant registry (`restaurants`), platform
+super-admin accounts (`platform_admins`), and a login **directory**
+(`user_directory`, email → restaurant), which are separate from any
 restaurant's own `users`.
 
 - **Platform super-admin** (`/api/platform/*`) creates and suspends
@@ -25,10 +26,13 @@ restaurant's own `users`.
   platform super-admin) with `{ name, slug, adminName, adminEmail,
   adminPassword }` — creates the restaurant's schema, runs every tenant
   migration into it, and creates its first admin user in one call.
-- **Tenant login**: `POST /api/auth/login` now takes `{ restaurantSlug,
-  email, password }` — the slug is how the server finds the right schema to
-  check credentials against, since each restaurant's `users` table is
-  physically separate.
+- **Tenant login**: `POST /api/auth/login` takes just `{ email, password }`,
+  same as before multi-tenancy — the `user_directory` table (kept in sync by
+  `tenantProvisioningService` and `userController` on every user
+  create/update/delete) maps the email to the right restaurant/schema behind
+  the scenes. The trade-off: **an email can only ever belong to one
+  restaurant** — creating a user with an email already registered elsewhere
+  returns `409`.
 - Every authenticated tenant request runs inside its own DB transaction with
   `search_path` pointed at that restaurant's schema (see
   `middlewares/tenantScope.js`) — this is what lets every model/controller

@@ -1,3 +1,4 @@
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { PlatformAdmin } = require("../../models");
 const logger = require("../../utils/logger");
@@ -39,4 +40,29 @@ async function me(req, res, next) {
   }
 }
 
-module.exports = { login, me };
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "currentPassword and newPassword are required" });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "newPassword must be at least 8 characters" });
+    }
+
+    const admin = await PlatformAdmin.scope("withPassword").findByPk(req.platformAdmin.id);
+    if (!(await admin.comparePassword(currentPassword))) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    admin.passwordHash = await bcrypt.hash(newPassword, 10);
+    await admin.save();
+    logger.info("platform_auth.password_changed", { adminId: admin.id });
+
+    res.json({ message: "Password updated" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, me, changePassword };

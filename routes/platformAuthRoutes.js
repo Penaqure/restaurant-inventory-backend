@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.post("/login", platformAuthController.login);
 router.get("/me", protectPlatform, platformAuthController.me);
+router.post("/change-password", protectPlatform, platformAuthController.changePassword);
 
 module.exports = router;

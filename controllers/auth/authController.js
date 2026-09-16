@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { Restaurant, User } = require("../../models");
+const { Restaurant, User, UserDirectory } = require("../../models");
 const { runInTenantSchema } = require("../../services/tenantContext");
 const logger = require("../../utils/logger");
 
@@ -14,24 +14,29 @@ function signToken(user, restaurant) {
 
 async function login(req, res, next) {
   try {
-    const { restaurantSlug, email, password } = req.body;
-    if (!restaurantSlug || !email || !password) {
-      return res.status(400).json({ message: "restaurantSlug, email and password are required" });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "email and password are required" });
     }
 
-    const restaurant = await Restaurant.findOne({ where: { slug: restaurantSlug.toLowerCase() } });
-    if (!restaurant || restaurant.status !== "active") {
-      logger.warn("auth.login_failed", { restaurantSlug, reason: "unknown_or_inactive_restaurant" });
-      return res.status(401).json({ message: "Invalid restaurant, email or password" });
+    // Each restaurant has its own separate `users` table (schema-per-tenant),
+    // so a bare email can't be looked up directly -- the directory (kept in
+    // sync by tenantProvisioningService and userController) maps it to the
+    // restaurant to check credentials against.
+    const directoryEntry = await UserDirectory.findOne({ where: { email: email.toLowerCase() } });
+    const restaurant = directoryEntry && (await Restaurant.findByPk(directoryEntry.restaurantId));
+    if (!directoryEntry || !restaurant || restaurant.status !== "active") {
+      logger.warn("auth.login_failed", { email: email.toLowerCase(), reason: "unknown_or_inactive_restaurant" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const user = await runInTenantSchema(restaurant.schemaName, (t) =>
-      User.scope("withPassword").findOne({ where: { email: email.toLowerCase() }, transaction: t })
+      User.scope("withPassword").findByPk(directoryEntry.tenantUserId, { transaction: t })
     );
 
     if (!user || !(await user.comparePassword(password))) {
-      logger.warn("auth.login_failed", { restaurantSlug, email: email.toLowerCase() });
-      return res.status(401).json({ message: "Invalid restaurant, email or password" });
+      logger.warn("auth.login_failed", { email: email.toLowerCase() });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
     if (user.status !== "active") {
       return res.status(403).json({ message: "This account has been disabled." });
