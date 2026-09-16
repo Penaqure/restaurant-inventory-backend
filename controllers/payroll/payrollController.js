@@ -99,7 +99,7 @@ async function generateRun(req, res, next) {
     const created = await PayrollRun.findByPk(run.id, { include: runIncludes });
     const payslips = await Payslip.findAll({ where: { payrollRunId: run.id }, include: payslipIncludes });
 
-    notificationService.emitToRoles(["admin"], "payroll:run_generated", {
+    notificationService.emitToRoles(req.restaurant.id, ["admin"], "payroll:run_generated", {
       runId: run.id,
       month,
       year,

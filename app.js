@@ -13,6 +13,8 @@ const payrollRoutes = require("./routes/payrollRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const userRoutes = require("./routes/userRoutes");
 const billingRoutes = require("./routes/billingRoutes");
+const platformAuthRoutes = require("./routes/platformAuthRoutes");
+const platformRestaurantRoutes = require("./routes/platformRestaurantRoutes");
 const sequelize = require("./config/db");
 const logger = require("./utils/logger");
 const notificationService = require("./services/notificationService");
@@ -33,6 +35,8 @@ app.use("/api/payroll", payrollRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/billing", billingRoutes);
+app.use("/api/platform/auth", platformAuthRoutes);
+app.use("/api/platform/restaurants", platformRestaurantRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

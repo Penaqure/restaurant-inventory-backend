@@ -3,12 +3,13 @@ const employeeController = require("../controllers/payroll/employeeController");
 const advanceController = require("../controllers/payroll/advanceController");
 const payrollController = require("../controllers/payroll/payrollController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
+const { openTenantTransaction } = require("../middlewares/tenantScope");
 
 const router = express.Router();
 
 // Salary/payroll data is sensitive -- admin only, no staff access at all
 // (unlike stock/equipment, which staff can view).
-router.use(protect, authorizeRoles("admin"));
+router.use(protect, openTenantTransaction, authorizeRoles("admin"));
 
 router.get("/employees", employeeController.listEmployees);
 router.post("/employees", employeeController.createEmployee);

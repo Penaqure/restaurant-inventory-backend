@@ -2,10 +2,11 @@ const express = require("express");
 const supplierController = require("../controllers/supplier/supplierController");
 const supplierPaymentController = require("../controllers/supplier/supplierPaymentController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
+const { openTenantTransaction } = require("../middlewares/tenantScope");
 
 const router = express.Router();
 
-router.use(protect);
+router.use(protect, openTenantTransaction);
 
 router.get("/", supplierController.listSuppliers);
 router.post("/", authorizeRoles("admin"), supplierController.createSupplier);

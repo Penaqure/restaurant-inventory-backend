@@ -1,10 +1,38 @@
 # Inventory System — Backend
 
-A standalone inventory, store, equipment, payroll, and credit management system.
-Genuinely separate from `restaurant-billing-backend`: its own database, its own
-user accounts/login, its own deployment. It connects to the billing app only
+A **multi-tenant** inventory, store, equipment, payroll, and credit management
+system — one deployment serves any number of restaurants, each with fully
+isolated data (its own Postgres schema, its own users). Genuinely separate
+from `restaurant-billing-backend`: its own database, its own user
+accounts/login, its own deployment. It connects to the billing app only
 through a small **read-only** integration API — nothing here writes back to
 billing, and billing keeps working normally even if this app is offline.
+
+## Multi-tenancy
+
+Each restaurant gets its own Postgres **schema** containing all of its
+business tables (users, ingredients, stock, suppliers, equipment, payroll,
+...) — fully isolated from every other restaurant, all in one database. A
+`public` schema holds the restaurant registry (`restaurants`) and platform
+super-admin accounts (`platform_admins`), which are separate from any
+restaurant's own `users`.
+
+- **Platform super-admin** (`/api/platform/*`) creates and suspends
+  restaurants — there's no public signup. Bootstrap the first one with
+  `npm run create-platform-admin` (uses `ADMIN_EMAIL`/`ADMIN_PASSWORD` from
+  `.env`), then `POST /api/platform/auth/login`.
+- **Provisioning a restaurant**: `POST /api/platform/restaurants` (as the
+  platform super-admin) with `{ name, slug, adminName, adminEmail,
+  adminPassword }` — creates the restaurant's schema, runs every tenant
+  migration into it, and creates its first admin user in one call.
+- **Tenant login**: `POST /api/auth/login` now takes `{ restaurantSlug,
+  email, password }` — the slug is how the server finds the right schema to
+  check credentials against, since each restaurant's `users` table is
+  physically separate.
+- Every authenticated tenant request runs inside its own DB transaction with
+  `search_path` pointed at that restaurant's schema (see
+  `middlewares/tenantScope.js`) — this is what lets every model/controller
+  stay unaware of tenancy entirely.
 
 ## What it covers
 
@@ -31,6 +59,23 @@ and database.
 
 ## Local setup
 
+### Option A — Docker
+
+From the repo root (`restaurent-inventory-system/`):
+
+```bash
+cp .env.example .env   # fill in real secrets
+docker compose up -d --build
+docker compose run --rm backend npm run create-platform-admin
+```
+
+That starts Postgres, runs the platform-schema migrations, and brings up the
+API (`:5100`) and frontend (`:3001`). Provision your first restaurant via
+`POST /api/platform/restaurants` (see Multi-tenancy above) once you're
+logged in as the platform admin.
+
+### Option B — without Docker
+
 ```bash
 npm install
 
@@ -41,9 +86,9 @@ npm run db:dev
 
 # In another terminal:
 cp .env.example .env   # fill in real secrets before anything but local dev
-npm run db:migrate
-npm run create-admin    # creates the first login, from ADMIN_EMAIL/ADMIN_PASSWORD in .env
-npm run dev              # nodemon, http://localhost:5100
+npm run db:migrate               # platform schema only (restaurants, platform_admins)
+npm run create-platform-admin    # from ADMIN_EMAIL/ADMIN_PASSWORD in .env
+npm run dev                      # nodemon, http://localhost:5100
 ```
 
 ## Environment variables (`.env`)
@@ -56,7 +101,7 @@ npm run dev              # nodemon, http://localhost:5100
 | `FRONTEND_URL` | CORS origin, the inventory frontend's URL |
 | `BILLING_API_URL` | Base URL of `restaurant-billing-backend`'s API |
 | `BILLING_INTEGRATION_API_KEY` | Shared secret for the read-only billing integration — must match `INVENTORY_INTEGRATION_API_KEY` in `restaurant-billing-backend/.env` |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | Used once by `npm run create-admin` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` | Used once by `npm run create-platform-admin` (bootstraps the platform super-admin, not a tenant user) |
 
 ## Roles
 

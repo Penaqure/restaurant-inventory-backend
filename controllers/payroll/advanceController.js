@@ -47,7 +47,7 @@ async function createAdvance(req, res, next) {
 
     const created = await SalaryAdvance.findByPk(advance.id, { include: advanceIncludes });
 
-    notificationService.emitToRoles(["admin"], "payroll:advance_given", {
+    notificationService.emitToRoles(req.restaurant.id, ["admin"], "payroll:advance_given", {
       employeeId,
       employeeName: created.employee?.name,
       amount: created.amount,

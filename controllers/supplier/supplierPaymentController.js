@@ -28,7 +28,7 @@ async function recordPayment(req, res, next) {
 
     const created = await SupplierPayment.findByPk(payment.id, { include: paymentIncludes });
 
-    notificationService.emitToRoles(["admin"], "supplier:payment_recorded", {
+    notificationService.emitToRoles(req.restaurant.id, ["admin"], "supplier:payment_recorded", {
       supplierId,
       supplierName: created.supplier?.name,
       amount: created.amount,

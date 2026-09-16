@@ -78,7 +78,7 @@ async function updateEquipment(req, res, next) {
     logger.info("equipment.updated", { userId: req.user.id, equipmentId: item.id });
 
     if (condition && condition !== previousCondition && (condition === "damaged" || condition === "under_repair")) {
-      notificationService.emitToAll("equipment:condition_alert", {
+      notificationService.emitToAll(req.restaurant.id, "equipment:condition_alert", {
         equipmentId: item.id,
         name: item.name,
         condition,

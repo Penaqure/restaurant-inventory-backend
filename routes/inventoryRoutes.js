@@ -3,10 +3,11 @@ const stockLocationController = require("../controllers/inventory/stockLocationC
 const ingredientController = require("../controllers/inventory/ingredientController");
 const stockController = require("../controllers/inventory/stockController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
+const { openTenantTransaction } = require("../middlewares/tenantScope");
 
 const router = express.Router();
 
-router.use(protect);
+router.use(protect, openTenantTransaction);
 
 router.get("/locations", stockLocationController.listLocations);
 router.post("/locations", authorizeRoles("admin"), stockLocationController.createLocation);

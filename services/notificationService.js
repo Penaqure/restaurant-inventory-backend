@@ -4,12 +4,13 @@ const logger = require("../utils/logger");
 
 let io = null;
 
-// Single-tenant, so rooms are just per-role rather than per-vendor+role like
-// restaurant-billing-backend's version -- a role room is enough to keep
-// financial events (payroll, supplier credit) off a staff account's socket
-// entirely, not just hidden client-side.
-function roleRoom(role) {
-  return `role:${role}`;
+// Rooms are scoped per-restaurant-then-role so an event for one restaurant
+// never reaches a socket connected on behalf of a different restaurant --
+// with multiple tenants sharing one process, a role-only room would leak
+// every restaurant's financial/stock alerts to every other restaurant's
+// admins.
+function roleRoom(restaurantId, role) {
+  return `restaurant:${restaurantId}:role:${role}`;
 }
 
 function init(httpServer) {
@@ -20,14 +21,19 @@ function init(httpServer) {
   // Same JWT the REST API issues, verified without a DB round-trip per
   // connection -- a deactivated user stays connected until the token
   // expires or the page reloads; the REST API remains the real access
-  // control boundary.
+  // control boundary. Only tenant-user tokens carry a restaurantId, so
+  // platform-admin tokens are simply not accepted here.
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error("Not authenticated"));
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = payload.id;
+      if (payload.type !== "tenant" || !payload.restaurantId) {
+        return next(new Error("Not authenticated"));
+      }
+      socket.userId = payload.sub;
       socket.role = payload.role;
+      socket.restaurantId = payload.restaurantId;
       next();
     } catch {
       next(new Error("Not authenticated"));
@@ -35,25 +41,25 @@ function init(httpServer) {
   });
 
   io.on("connection", (socket) => {
-    socket.join(roleRoom(socket.role));
+    socket.join(roleRoom(socket.restaurantId, socket.role));
   });
 
   logger.info("notifications.socket_ready");
 }
 
-function emitToRoles(roles, event, payload) {
+function emitToRoles(restaurantId, roles, event, payload) {
   if (!io || roles.length === 0) return;
-  io.to(roles.map(roleRoom)).emit(event, payload);
+  io.to(roles.map((role) => roleRoom(restaurantId, role))).emit(event, payload);
 }
 
-function emitToAll(event, payload) {
-  emitToRoles(["admin", "staff"], event, payload);
+function emitToAll(restaurantId, event, payload) {
+  emitToRoles(restaurantId, ["admin", "staff"], event, payload);
 }
 
 const LOW_STOCK_DEBOUNCE_MS = 30 * 60 * 1000;
 const lastLowStockNotice = new Map(); // ingredientStockId -> ms timestamp
 
-async function checkLowStock({ ingredientStockId, actorUserId }) {
+async function checkLowStock({ restaurantId, ingredientStockId, actorUserId }) {
   if (!io || !ingredientStockId) return;
   try {
     const { IngredientStock, Ingredient, StockLocation } = require("../models");
@@ -71,7 +77,7 @@ async function checkLowStock({ ingredientStockId, actorUserId }) {
     lastLowStockNotice.set(ingredientStockId, Date.now());
 
     // Relevant to whoever handles day-to-day stock, not just admin.
-    emitToAll("stock:low_stock", {
+    emitToAll(restaurantId, "stock:low_stock", {
       ingredientId: stockRow.ingredientId,
       ingredientName: stockRow.ingredient.name,
       unit: stockRow.ingredient.unit,

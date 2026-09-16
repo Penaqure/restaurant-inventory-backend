@@ -92,9 +92,13 @@ async function recordMovement(req, res, next) {
     const created = await StockMovement.findByPk(movement.id, { include: movementIncludes });
     const reloadedStock = await stockRow.reload();
 
-    notificationService.checkLowStock({ ingredientStockId: reloadedStock.id, actorUserId: req.user.id });
+    await notificationService.checkLowStock({
+      restaurantId: req.restaurant.id,
+      ingredientStockId: reloadedStock.id,
+      actorUserId: req.user.id,
+    });
     if (type === "purchase" && paymentStatus === "credit") {
-      notificationService.emitToRoles(["admin"], "supplier:credit_purchase", {
+      notificationService.emitToRoles(req.restaurant.id, ["admin"], "supplier:credit_purchase", {
         supplierId: created.supplierId,
         supplierName: created.supplier?.name,
         ingredientName: created.ingredient.name,

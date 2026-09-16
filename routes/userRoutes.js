@@ -1,12 +1,13 @@
 const express = require("express");
 const userController = require("../controllers/userController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
+const { openTenantTransaction } = require("../middlewares/tenantScope");
 
 const router = express.Router();
 
 // Account management is admin only -- staff can't create or edit logins,
 // including their own.
-router.use(protect, authorizeRoles("admin"));
+router.use(protect, openTenantTransaction, authorizeRoles("admin"));
 
 router.get("/", userController.listUsers);
 router.post("/", userController.createUser);

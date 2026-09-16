@@ -9,7 +9,7 @@
     "db:migrate": "sequelize-cli db:migrate",
     "db:migrate:undo": "sequelize-cli db:migrate:undo",
     "db:seed:all": "sequelize-cli db:seed:all",
-    "create-admin": "node utils/scripts/createAdmin.js"
+    "create-platform-admin": "node utils/scripts/createAdmin.js"
   },
   "license": "ISC",
   "dependencies": {
@@ -24,6 +24,7 @@
     "sequelize": "^6.37.7",
     "sequelize-cli": "^6.6.2",
     "socket.io": "^4.8.3",
+    "umzug": "^2.3.0",
     "winston": "^3.18.3"
   },
   "devDependencies": {
