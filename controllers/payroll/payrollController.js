@@ -1,4 +1,5 @@
 const { sequelize, PayrollRun, Payslip, Employee, SalaryAdvance, User } = require("../../models");
+const { PAYMENT_METHODS } = require("../../utils/paymentMethods");
 const logger = require("../../utils/logger");
 const notificationService = require("../../services/notificationService");
 
@@ -131,11 +132,16 @@ async function finalizeRun(req, res, next) {
 
 async function markPayslipPaid(req, res, next) {
   try {
+    const { paymentMethod } = req.body;
+    if (!PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({ message: `paymentMethod must be one of ${PAYMENT_METHODS.join(", ")}` });
+    }
+
     const payslip = await Payslip.findByPk(req.params.id, { include: payslipIncludes });
     if (!payslip) return res.status(404).json({ message: "Payslip not found" });
     if (payslip.status === "paid") return res.status(409).json({ message: "This payslip is already marked paid" });
 
-    await payslip.update({ status: "paid", paidAt: new Date() });
+    await payslip.update({ status: "paid", paidAt: new Date(), paymentMethod });
     logger.info("payslip.paid", { userId: req.user.id, payslipId: payslip.id, employeeId: payslip.employeeId });
     res.json(payslip);
   } catch (err) {

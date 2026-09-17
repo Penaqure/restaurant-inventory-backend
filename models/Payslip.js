@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
       netPay: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
       status: { type: DataTypes.ENUM("pending", "paid"), allowNull: false, defaultValue: "pending" },
       paidAt: { type: DataTypes.DATE, allowNull: true },
+      paymentMethod: {
+        type: DataTypes.ENUM("cash", "upi", "bank_transfer"),
+        allowNull: true,
+      },
     },
     {
       tableName: "payslips",

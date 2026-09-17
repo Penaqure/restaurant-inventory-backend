@@ -8,6 +8,7 @@
     "db:dev": "node scripts/dev-db.mjs",
     "db:migrate": "sequelize-cli db:migrate",
     "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:tenants": "node scripts/migrateAllTenants.js",
     "db:seed:all": "sequelize-cli db:seed:all",
     "create-platform-admin": "node utils/scripts/createAdmin.js"
   },

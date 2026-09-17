@@ -10,6 +10,11 @@ module.exports = (sequelize, DataTypes) => {
       supplierId: { type: DataTypes.UUID, allowNull: false },
       amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
       paidAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
+      paymentMethod: {
+        type: DataTypes.ENUM("cash", "upi", "bank_transfer"),
+        allowNull: false,
+        defaultValue: "cash",
+      },
       note: { type: DataTypes.STRING, allowNull: true },
       createdBy: { type: DataTypes.UUID, allowNull: false },
     },

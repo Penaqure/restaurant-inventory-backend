@@ -1,4 +1,5 @@
 const { sequelize, SalaryAdvance, Employee } = require("../../models");
+const { normalizePaymentMethod } = require("../../utils/paymentMethods");
 const logger = require("../../utils/logger");
 const notificationService = require("../../services/notificationService");
 
@@ -27,7 +28,7 @@ async function listAdvances(req, res, next) {
 
 async function createAdvance(req, res, next) {
   try {
-    const { employeeId, amount, dateGiven, note } = req.body;
+    const { employeeId, amount, dateGiven, paymentMethod, note } = req.body;
     if (!employeeId || !(Number(amount) > 0) || !dateGiven) {
       return res.status(400).json({ message: "employeeId, a positive amount, and dateGiven are required" });
     }
@@ -40,6 +41,7 @@ async function createAdvance(req, res, next) {
       amount,
       outstandingAmount: amount,
       dateGiven,
+      paymentMethod: normalizePaymentMethod(paymentMethod),
       note: note || null,
       createdBy: req.user.id,
     });

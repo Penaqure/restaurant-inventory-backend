@@ -1,4 +1,5 @@
 const { sequelize, SupplierPayment, Supplier, User } = require("../../models");
+const { normalizePaymentMethod } = require("../../utils/paymentMethods");
 const logger = require("../../utils/logger");
 const notificationService = require("../../services/notificationService");
 
@@ -9,7 +10,7 @@ const paymentIncludes = [
 
 async function recordPayment(req, res, next) {
   try {
-    const { supplierId, amount, paidAt, note } = req.body;
+    const { supplierId, amount, paidAt, paymentMethod, note } = req.body;
     if (!supplierId || !(Number(amount) > 0)) {
       return res.status(400).json({ message: "supplierId and a positive amount are required" });
     }
@@ -21,6 +22,7 @@ async function recordPayment(req, res, next) {
       supplierId,
       amount,
       paidAt: paidAt || new Date(),
+      paymentMethod: normalizePaymentMethod(paymentMethod),
       note: note || null,
       createdBy: req.user.id,
     });

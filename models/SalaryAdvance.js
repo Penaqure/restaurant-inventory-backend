@@ -14,6 +14,11 @@ module.exports = (sequelize, DataTypes) => {
       // (advanceController.repay). Never edited outside those two paths.
       outstandingAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
       dateGiven: { type: DataTypes.DATEONLY, allowNull: false },
+      paymentMethod: {
+        type: DataTypes.ENUM("cash", "upi", "bank_transfer"),
+        allowNull: false,
+        defaultValue: "cash",
+      },
       note: { type: DataTypes.STRING, allowNull: true },
       createdBy: { type: DataTypes.UUID, allowNull: false },
     },
