@@ -121,6 +121,7 @@ async function listMovements(req, res, next) {
     const where = {};
     if (req.query.ingredientId) where.ingredientId = req.query.ingredientId;
     if (req.query.stockLocationId) where.stockLocationId = req.query.stockLocationId;
+    if (req.query.supplierId) where.supplierId = req.query.supplierId;
     if (req.query.from || req.query.to) {
       where.createdAt = {};
       if (req.query.from) where.createdAt[Op.gte] = new Date(`${req.query.from}T00:00:00`);

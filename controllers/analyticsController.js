@@ -1,15 +1,5 @@
 const { sequelize, PayrollRun, Payslip, Equipment } = require("../models");
-
-// Every "days"/"months"/"limit" query param is coerced to a bounded integer
-// in JS before being embedded in a raw query -- never interpolated as a raw
-// string -- so there's no injection surface despite not using a bound
-// parameter for the INTERVAL literal (node-postgres can't parameterize
-// inside an INTERVAL expression cleanly).
-function boundedInt(value, fallback, min, max) {
-  const n = parseInt(value, 10);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, n));
-}
+const { boundedInt } = require("../utils/boundedInt");
 
 async function getOverview(req, res, next) {
   try {

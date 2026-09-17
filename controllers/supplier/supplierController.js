@@ -1,10 +1,21 @@
-const { Supplier, StockMovement } = require("../../models");
+const { sequelize, Supplier, StockMovement } = require("../../models");
+const { boundedInt } = require("../../utils/boundedInt");
 const logger = require("../../utils/logger");
 
 async function listSuppliers(req, res, next) {
   try {
     const suppliers = await Supplier.findAll({ order: [["name", "ASC"]] });
     res.json(suppliers);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getSupplier(req, res, next) {
+  try {
+    const supplier = await Supplier.findByPk(req.params.id);
+    if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+    res.json(supplier);
   } catch (err) {
     next(err);
   }
@@ -65,4 +76,69 @@ async function deleteSupplier(req, res, next) {
   }
 }
 
-module.exports = { listSuppliers, createSupplier, updateSupplier, deleteSupplier };
+// Every ingredient ever bought from this supplier, aggregated across all of
+// history (not just the 200-row window stockController.listMovements caps
+// at) -- the totals a "what do we buy from them" view actually needs.
+async function getSupplierItems(req, res, next) {
+  try {
+    const supplier = await Supplier.findByPk(req.params.id);
+    if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+    const rows = await sequelize.query(
+      `SELECT i.id AS ingredient_id, i.name, i.unit,
+              SUM(m.quantity_change) AS total_quantity,
+              SUM(m.quantity_change * COALESCE(m.unit_cost, 0)) AS total_spend,
+              MAX(m.created_at) AS last_purchased_at
+       FROM stock_movements m
+       JOIN ingredients i ON i.id = m.ingredient_id
+       WHERE m.type = 'purchase' AND m.supplier_id = :supplierId
+       GROUP BY i.id, i.name, i.unit
+       ORDER BY total_spend DESC`,
+      { replacements: { supplierId: supplier.id }, type: sequelize.QueryTypes.SELECT }
+    );
+    res.json(
+      rows.map((r) => ({
+        ingredientId: r.ingredient_id,
+        name: r.name,
+        unit: r.unit,
+        totalQuantity: Number(r.total_quantity),
+        totalSpend: Number(r.total_spend),
+        lastPurchasedAt: r.last_purchased_at,
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getSupplierSpendTrend(req, res, next) {
+  try {
+    const supplier = await Supplier.findByPk(req.params.id);
+    if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+    const months = boundedInt(req.query.months, 6, 1, 24);
+    const rows = await sequelize.query(
+      `SELECT DATE_TRUNC('month', created_at) AS month,
+              SUM(quantity_change * COALESCE(unit_cost, 0)) AS total_spend
+       FROM stock_movements
+       WHERE type = 'purchase' AND supplier_id = :supplierId
+         AND created_at >= NOW() - INTERVAL '${months} months'
+       GROUP BY DATE_TRUNC('month', created_at)
+       ORDER BY month ASC`,
+      { replacements: { supplierId: supplier.id }, type: sequelize.QueryTypes.SELECT }
+    );
+    res.json(rows.map((r) => ({ month: r.month, totalSpend: Number(r.total_spend) })));
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  listSuppliers,
+  getSupplier,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+  getSupplierItems,
+  getSupplierSpendTrend,
+};

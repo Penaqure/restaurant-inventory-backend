@@ -19,4 +19,11 @@ router.get("/balances", authorizeRoles("admin"), supplierPaymentController.getBa
 router.get("/payments", authorizeRoles("admin"), supplierPaymentController.listPayments);
 router.post("/payments", authorizeRoles("admin"), supplierPaymentController.recordPayment);
 
+// Registered after the literal /balances and /payments routes above --
+// otherwise this would swallow them (Express matches :id against any single
+// path segment, including "balances"/"payments").
+router.get("/:id", authorizeRoles("admin"), supplierController.getSupplier);
+router.get("/:id/items", authorizeRoles("admin"), supplierController.getSupplierItems);
+router.get("/:id/spend-trend", authorizeRoles("admin"), supplierController.getSupplierSpendTrend);
+
 module.exports = router;
